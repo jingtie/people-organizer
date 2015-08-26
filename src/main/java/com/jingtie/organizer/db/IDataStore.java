@@ -13,15 +13,15 @@ public interface IDataStore {
 
     PersonDao createPerson(String name, String email) throws SQLException;
 
-    PersonDao getPerson(int id) throws SQLException;
+    PersonDao getPerson(int personId) throws SQLException;
 
     FamilyDao createFamily(String name, List<Integer> memberIds) throws SQLException;
 
-    FamilyDao getFamily(int id) throws SQLException;
+    FamilyDao getFamily(int familyId) throws SQLException;
 
     List<PersonDao> getMembers(int familyId) throws SQLException;
 
-    void putPersonInFamily(int personId, int familyId) throws SQLException;
+    List<Integer> putPersonInFamilies(int personId, List<Integer> familyIds) throws SQLException;
 
     void deletePerson(int personId) throws SQLException;
 

@@ -1,5 +1,6 @@
 package com.jingtie.organizer.resource;
 
+import com.jingtie.organizer.dao.FamilyDao;
 import com.jingtie.organizer.dao.PersonDao;
 import com.jingtie.organizer.db.H2Impl;
 import com.jingtie.organizer.db.IDataStore;
@@ -11,6 +12,8 @@ import javax.ws.rs.core.Response;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 
 import static org.junit.Assert.assertTrue;
 
@@ -26,25 +29,38 @@ public class FamilyResource {
     @Produces(MediaType.APPLICATION_JSON)
     public DataEntity createFamily(
             @FormParam("name") String name,
-            @FormParam("email") String email)
+            @FormParam("memberIds") String memberIds)
     {
         assertTrue("name is empty", name != null && !name.equals(""));
-        assertTrue("email is empty", email != null && !email.equals(""));
 
         try
         {
             final IDataStore dataStore = H2Impl.getInstance();
-            final PersonDao person = dataStore.createPerson(name, email);
-            logger.debug("Person created: " + person.getId());
+            final List<Integer> memberIdList = new LinkedList<>();
+            if(memberIds != null && !memberIds.equals(""))
+            {
+                String[] ids = memberIds.split(";");
+                for(String idString : ids)
+                {
+                    idString = idString.trim();
+                    if(idString != null && !idString.equals(""))
+                    {
+                        int id = Integer.parseInt(idString);
+                        memberIdList.add(id);
+                    }
+                }
+            }
+            final FamilyDao family = dataStore.createFamily(name, memberIdList);
+            logger.info("Family created: " + family.getId());
 
-            HashMap props = new HashMap<>(1);
-            props.put("id", person.getId());
-            DataEntity dataEntity = new DataEntity(props);
+            final HashMap props = new HashMap<>(1);
+            props.put("familyId", family.getId());
+            final DataEntity dataEntity = new DataEntity(props);
             return dataEntity;
         }
         catch (Throwable t)
         {
-            logger.error("Create new person exception", t);
+            logger.error("Create new family exception", t);
 
             final StringWriter sw = new StringWriter();
             final PrintWriter pw = new PrintWriter(sw);
@@ -57,39 +73,43 @@ public class FamilyResource {
 
 
     @GET
-    @Path("{id}")
+    @Path("{familyId}")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getFamily(@PathParam("id") int id)
+    public DataEntity getFamily(@PathParam("familyId") String familyId)
     {
-        assertTrue("id should larger than 0", id > 0);
+        assertTrue("familyId is empty", familyId != null && !familyId.equals(""));
 
         try
         {
+            final int id = Integer.parseInt(familyId);
             final IDataStore dataStore = H2Impl.getInstance();
-            final PersonDao person = dataStore.getPerson(id);
-            if(person == null)
+            final FamilyDao family = dataStore.getFamily(id);
+            if(family == null)
             {
-                return Response.status(Response.Status.NOT_FOUND).entity("Person Not Found or Been Deleted").type("text/plain").build();
+                logger.error("Family Not Found or Been Deleted");
+                throw new NotFoundException("Family Not Found or Been Deleted");
             }
 
-            HashMap<String, String> result = new HashMap<>();
-            result.put("name", person.getName());
-            result.put("email", person.getEmail());
-            result.put("createdTime", person.getCreatedTime() + "");
+            List<PersonDao> members = dataStore.getMembers(id);
 
-            Response.ResponseBuilder builder = Response.ok().entity(result);
-            return builder.build();
+            HashMap<String, Object> props = new HashMap<>();
+            props.put("name", family.getName());
+            props.put("members", members);
+            props.put("createdTime", family.getCreatedTime() + "");
+
+            final DataEntity dataEntity = new DataEntity(props);
+            return dataEntity;
         }
         catch (Throwable t)
         {
-            logger.error("Get person exception", t);
+            logger.error("Get family exception", t);
 
             final StringWriter sw = new StringWriter();
             final PrintWriter pw = new PrintWriter(sw);
             t.printStackTrace(pw);
             final String errorMessage = t.getMessage() + ", StackTrace: " + sw.toString();
 
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(errorMessage).type("text/plain").build();
+            throw new OrganizerException(Response.Status.INTERNAL_SERVER_ERROR, errorMessage);
         }
     }
 

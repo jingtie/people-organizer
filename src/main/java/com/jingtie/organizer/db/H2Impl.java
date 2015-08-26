@@ -111,8 +111,8 @@ public class H2Impl implements IDataStore {
     }
 
     @Override
-    public PersonDao getPerson(int id) throws SQLException {
-        assertTrue("person id is not set", id > 0);
+    public PersonDao getPerson(int personId) throws SQLException {
+        assertTrue("person id is not set", personId > 0);
 
         PreparedStatement stmt = null;
         Connection connection = null;
@@ -125,7 +125,7 @@ public class H2Impl implements IDataStore {
 
             String sql = "SELECT NAME, EMAIL, CREATED_TIME, MODIFIED_TIME FROM " + schemaName + ".PERSON WHERE ID=? AND DELETED_TIME IS NULL;";
             stmt = connection.prepareStatement(sql);
-            stmt.setInt(1, id);
+            stmt.setInt(1, personId);
 
             resultSet = stmt.executeQuery();
 
@@ -135,7 +135,7 @@ public class H2Impl implements IDataStore {
                 String email = resultSet.getString(2);
                 Timestamp createdTimestamp = resultSet.getTimestamp(3);
                 Timestamp modifiedTimestamp = resultSet.getTimestamp(4);
-                person = new PersonDao(id, name, email, createdTimestamp.getTime(), modifiedTimestamp.getTime(), null);
+                person = new PersonDao(personId, name, email, createdTimestamp.getTime(), modifiedTimestamp.getTime(), null);
             }
         }
         finally
@@ -220,8 +220,8 @@ public class H2Impl implements IDataStore {
     }
 
     @Override
-    public FamilyDao getFamily(int id) throws SQLException {
-        assertTrue("family id is not set", id > 0);
+    public FamilyDao getFamily(int familyId) throws SQLException {
+        assertTrue("family id is not set", familyId > 0);
 
         PreparedStatement stmt = null;
         Connection connection = null;
@@ -234,7 +234,7 @@ public class H2Impl implements IDataStore {
 
             String sql = "SELECT NAME, CREATED_TIME, MODIFIED_TIME FROM " + schemaName + ".FAMILY WHERE ID=? AND DELETED_TIME IS NULL;";
             stmt = connection.prepareStatement(sql);
-            stmt.setInt(1, id);
+            stmt.setInt(1, familyId);
 
             resultSet = stmt.executeQuery();
 
@@ -243,7 +243,7 @@ public class H2Impl implements IDataStore {
                 String name = resultSet.getString(1);
                 Timestamp createdTimestamp = resultSet.getTimestamp(2);
                 Timestamp modifiedTimestamp = resultSet.getTimestamp(3);
-                family = new FamilyDao(id, name, createdTimestamp.getTime(), modifiedTimestamp.getTime(), null);
+                family = new FamilyDao(familyId, name, createdTimestamp.getTime(), modifiedTimestamp.getTime(), null);
             }
         }
         finally
@@ -296,33 +296,65 @@ public class H2Impl implements IDataStore {
     }
 
     @Override
-    public void putPersonInFamily(int personId, int familyId) throws SQLException {
+    public List<Integer> putPersonInFamilies(int personId, List<Integer> familyIds) throws SQLException {
         assertTrue("person id should larger than 0", personId > 0);
-        assertTrue("family id should larger than 0", familyId > 0);
 
         Connection connection = null;
         PreparedStatement stmt = null;
+        ResultSet resultSet = null;
+        List<Integer> resultFamilyIds = new LinkedList<>();
         try
         {
             Timestamp timestamp = getCurrentTimeStamp();
-            connection = poolingDataStore.getConnection();
+            connection = poolingDataStore.startTransaction(Connection.TRANSACTION_READ_COMMITTED);
 
-            String sql = "INSERT INTO " + schemaName + ".FAMILY_MEMBER (FAMILY_ID, PERSON_ID, CREATED_TIME) VALUES (?,?,?);";
-            stmt = connection.prepareStatement(sql);
-            stmt.setInt(1, familyId);
-            stmt.setInt(2, personId);
-            stmt.setTimestamp(3, timestamp);
-
-            int affectedRows = stmt.executeUpdate();
-            if(affectedRows == 0)
+            if(familyIds != null && familyIds.size() > 0)
             {
-                throw new SQLException("Putting Person " + personId + " to Family " + familyId + " failed, no row affected");
+                String sql = "INSERT INTO " + schemaName + ".FAMILY_MEMBER (FAMILY_ID, PERSON_ID, CREATED_TIME) VALUES (?,?,?);";
+
+                for(int familyId : familyIds)
+                {
+                    stmt = connection.prepareStatement(sql);
+                    stmt.setInt(1, familyId);
+                    stmt.setInt(2, personId);
+                    stmt.setTimestamp(3, timestamp);
+
+                    int affectedRows = stmt.executeUpdate();
+                    poolingDataStore.close(null, stmt, null);
+
+                    if(affectedRows == 0)
+                    {
+                        throw new SQLException("Putting Person " + personId + " to Family " + familyId + " failed, no row affected");
+                    }
+                }
             }
+
+            String sql = "SELECT FAMILY_MEMBER.FAMILY_ID FROM " + schemaName + ".FAMILY_MEMBER INNER JOIN " + schemaName +
+                    ".FAMILY ON (FAMILY_MEMBER.FAMILY_ID = FAMILY.ID) WHERE FAMILY_MEMBER.PERSON_ID = ? " +
+                    "AND FAMILY.DELETED_TIME IS NULL;";
+            stmt = connection.prepareStatement(sql);
+            stmt.setInt(1, personId);
+            resultSet = stmt.executeQuery();
+
+            while(resultSet.next())
+            {
+                int familyId = resultSet.getInt(1);
+                resultFamilyIds.add(familyId);
+            }
+
+            poolingDataStore.commitTransaction(connection);
+        }
+        catch (Throwable t)
+        {
+            poolingDataStore.abortTransaction(connection);
+            throw t;
         }
         finally
         {
-            poolingDataStore.close(connection, stmt, null);
+            poolingDataStore.close(connection, stmt, resultSet);
         }
+
+        return resultFamilyIds;
     }
 
     @Override

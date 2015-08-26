@@ -11,6 +11,8 @@ import javax.ws.rs.core.Response;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 
 import static org.junit.Assert.assertTrue;
 
@@ -37,9 +39,9 @@ public class PersonResource {
             final PersonDao person = dataStore.createPerson(name, email);
             logger.debug("Person created: " + person.getId());
 
-            HashMap<String, Object> props = new HashMap<>(1);
+            final HashMap<String, Object> props = new HashMap<>(1);
             props.put("personId", person.getId());
-            DataEntity dataEntity = new DataEntity(props);
+            final DataEntity dataEntity = new DataEntity(props);
             return dataEntity;
         }
         catch (Throwable t)
@@ -67,7 +69,7 @@ public class PersonResource {
 
         try
         {
-            int id = Integer.parseInt(personId);
+            final int id = Integer.parseInt(personId);
             final IDataStore dataStore = H2Impl.getInstance();
             final PersonDao person = dataStore.getPerson(id);
             if(person == null)
@@ -76,12 +78,12 @@ public class PersonResource {
                 throw new OrganizerException(Response.Status.NOT_FOUND, "Person Not Found or Been Deleted");
             }
 
-            HashMap<String, Object> props = new HashMap<>();
+            final HashMap<String, Object> props = new HashMap<>();
             props.put("name", person.getName());
             props.put("email", person.getEmail());
             props.put("createdTime", person.getCreatedTime() + "");
 
-            DataEntity dataEntity = new DataEntity(props);
+            final DataEntity dataEntity = new DataEntity(props);
             return dataEntity;
         }
         catch (Throwable t)
@@ -96,6 +98,66 @@ public class PersonResource {
             throw new OrganizerException(Response.Status.INTERNAL_SERVER_ERROR, errorMessage);
         }
     }
+
+
+    @POST
+    @Path("/group/{personId}")
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+    @Produces(MediaType.APPLICATION_JSON)
+    public DataEntity groupPersonIntoFamilies(
+            @PathParam("personId") String personId,
+            @FormParam("familyIds") String familyIds)
+    {
+        assertTrue("personId is empty", personId != null && !personId.equals(""));
+        assertTrue("familyIds is empty", familyIds != null && !familyIds.equals(""));
+
+        try
+        {
+            int iPersonId = Integer.parseInt(personId);
+            final IDataStore dataStore = H2Impl.getInstance();
+            final PersonDao person = dataStore.getPerson(iPersonId);
+            if(person == null)
+            {
+                logger.error("Person Not Found or Been Deleted. personId=" + personId);
+                throw new OrganizerException(Response.Status.NOT_FOUND, "Person Not Found or Been Deleted");
+            }
+
+            final List<Integer> familyIdList = new LinkedList<>();
+            String[] ids = familyIds.split(";");
+            for(String idString : ids)
+            {
+                idString = idString.trim();
+                if(idString != null && !idString.equals(""))
+                {
+                    int id = Integer.parseInt(idString);
+                    familyIdList.add(id);
+                }
+            }
+
+            List<Integer> resultFamilyIds = dataStore.putPersonInFamilies(iPersonId, familyIdList);
+            logger.debug("Grouped person into families, total families: " + resultFamilyIds.size());
+
+            final HashMap<String, Object> props = new HashMap<>();
+            props.put("name", person.getName());
+            props.put("email", person.getEmail());
+            props.put("createdTime", person.getCreatedTime() + "");
+            props.put("familyIds", resultFamilyIds);
+            final DataEntity dataEntity = new DataEntity(props);
+            return dataEntity;
+        }
+        catch (Throwable t)
+        {
+            logger.error("Group person into families exception", t);
+
+            final StringWriter sw = new StringWriter();
+            final PrintWriter pw = new PrintWriter(sw);
+            t.printStackTrace(pw);
+            final String errorMessage = t.getMessage() + ", StackTrace: " + sw.toString();
+
+            throw new OrganizerException(Response.Status.INTERNAL_SERVER_ERROR, errorMessage);
+        }
+    }
+
 
 
     private static final Logger logger = Logger.getLogger(PersonResource.class);

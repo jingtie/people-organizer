@@ -1,5 +1,6 @@
 package com.jingtie.organizer;
 
+import com.jingtie.organizer.dao.PersonDao;
 import com.jingtie.organizer.resource.DataEntity;
 import com.jingtie.organizer.resource.GrizzlyServer;
 import com.sun.jersey.api.representation.Form;
@@ -17,6 +18,8 @@ import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
+import java.util.LinkedList;
+import java.util.List;
 
 import static org.junit.Assert.assertNotNull;
 
@@ -54,7 +57,29 @@ public class ResourceTest {
     }
 
     @Test
-    public void addPerson() throws Exception
+    public void tests()
+    {
+        int firstPersonId = createPerson();
+        int secondPersonId = createPerson();
+
+        List<Integer> memberIds = new LinkedList<>();
+        memberIds.add(firstPersonId);
+
+        int firstFamily = createFamily(memberIds);
+        List<Integer> familyIds = new LinkedList<>();
+        familyIds.add(firstFamily);
+        List<Integer> resultFamilyIds = groupPersonIntoFamilies(secondPersonId, familyIds);
+        assert resultFamilyIds.size() == 1;
+
+        int secondFamily = createFamily(memberIds);
+        familyIds.clear();
+        familyIds.add(secondFamily);
+        resultFamilyIds = groupPersonIntoFamilies(secondPersonId, familyIds);
+        assert resultFamilyIds.size() == 2;
+    }
+
+
+    public int createPerson()
     {
         Form input = new Form();
         String name = "person" + System.currentTimeMillis();
@@ -77,11 +102,86 @@ public class ResourceTest {
                 .request(MediaType.APPLICATION_JSON)
                 .get(DataEntity.class);
 
-        assertNotNull("person creation response should not be null", dataEntity);
+        assertNotNull("get person response should not be null", dataEntity);
         String gottenName = (String)dataEntity.getProperties().get("name");
         assert gottenName.equalsIgnoreCase(name);
-        System.out.println("Got created person's name: " + gottenName);
+        System.out.println("Got person's name: " + gottenName);
+
+        return personId;
     }
+
+
+    public int createFamily(List<Integer> memberIds)
+    {
+        Form input = new Form();
+        String name = "family" + System.currentTimeMillis();
+        input.putSingle("name", name);
+
+        StringBuilder stringBuilder = new StringBuilder();
+        if(memberIds != null && memberIds.size() > 0)
+        {
+            for(int personId : memberIds)
+            {
+                stringBuilder.append(personId).append(";");
+            }
+        }
+        input.putSingle("memberIds", stringBuilder.toString());
+
+        DataEntity dataEntity = webClient
+                .target(baseUri)
+                .path("/family/add")
+                .request(MediaType.APPLICATION_JSON)
+                .post(Entity.entity(input, MediaType.APPLICATION_FORM_URLENCODED), DataEntity.class);
+
+        assertNotNull("family creation response should not be null", dataEntity);
+        Integer familyId = (Integer)dataEntity.getProperties().get("familyId");
+        System.out.println("created familyId: " + familyId);
+
+        dataEntity = webClient
+                .target(baseUri)
+                .path("/family/" + familyId)
+                .request(MediaType.APPLICATION_JSON)
+                .get(DataEntity.class);
+
+        assertNotNull("get family response should not be null", dataEntity);
+        String gottenName = (String)dataEntity.getProperties().get("name");
+        assert gottenName.equalsIgnoreCase(name);
+        System.out.println("Got family's name: " + gottenName);
+
+        List<PersonDao> gottenMembers = (List<PersonDao>)dataEntity.getProperties().get("members");
+        assert gottenMembers.size() == memberIds.size();
+        System.out.println("Got family's members, size: " + gottenMembers.size());
+
+        return familyId;
+    }
+
+
+    public List<Integer> groupPersonIntoFamilies(int personId, List<Integer> familyIds)
+    {
+        Form input = new Form();
+        StringBuilder stringBuilder = new StringBuilder();
+        if(familyIds != null && familyIds.size() > 0)
+        {
+            for(int familyId : familyIds)
+            {
+                stringBuilder.append(familyId).append(";");
+            }
+        }
+        input.putSingle("familyIds", stringBuilder.toString());
+
+        DataEntity dataEntity = webClient
+                .target(baseUri)
+                .path("/person/group/" + personId)
+                .request(MediaType.APPLICATION_JSON)
+                .post(Entity.entity(input, MediaType.APPLICATION_FORM_URLENCODED), DataEntity.class);
+
+        assertNotNull("person should not be null", dataEntity);
+        List<Integer> resultFamilyIds = (List<Integer>)dataEntity.getProperties().get("familyIds");
+        System.out.println("result familyIds: " + resultFamilyIds.size());
+
+        return resultFamilyIds;
+    }
+
 
 
     private HttpServer server;

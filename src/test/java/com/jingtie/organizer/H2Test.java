@@ -35,7 +35,9 @@ public class H2Test {
 
             PersonDao secondPerson = createPerson();
             memberIds.add(secondPerson.getId());
-            dataStore.putPersonInFamily(secondPerson.getId(), firstFamily.getId());
+            List<Integer> familyIds = new LinkedList<>();
+            familyIds.add(firstFamily.getId());
+            dataStore.putPersonInFamilies(secondPerson.getId(), familyIds);
 
             List<PersonDao> members = dataStore.getMembers(firstFamily.getId());
             assert members.size() == 2;
@@ -51,7 +53,7 @@ public class H2Test {
                 assert member1 == firstPerson.getId();
             }
 
-            dataStore.putPersonInFamily(firstPerson.getId(), firstFamily.getId());
+            dataStore.putPersonInFamilies(firstPerson.getId(), familyIds);
             exception.expect(DbException.class);
             System.out.println("Expected exception: Unique index or primary key violation");
 
