@@ -1,21 +1,23 @@
 package com.jingtie.organizer;
 
-import com.jayway.awaitility.Awaitility;
-import com.jayway.restassured.RestAssured;
-import com.jayway.restassured.parsing.Parser;
-import com.jayway.restassured.path.json.JsonPath;
-import com.jayway.restassured.response.Response;
-import org.apache.commons.configuration.CompositeConfiguration;
+import com.jingtie.organizer.resource.DataEntity;
+import com.jingtie.organizer.resource.GrizzlyServer;
+import com.sun.jersey.api.representation.Form;
 import org.apache.log4j.Logger;
-import org.junit.BeforeClass;
+import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.jersey.jackson.JacksonFeature;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
-import java.util.HashMap;
-import java.util.Map;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.MediaType;
 
-import static com.jayway.restassured.RestAssured.expect;
-import static java.util.concurrent.TimeUnit.MINUTES;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertNotNull;
 
 /**
@@ -23,27 +25,21 @@ import static org.junit.Assert.assertNotNull;
  */
 public class ResourceTest {
 
-    @BeforeClass
-    public static void setUp() throws Exception
-    {
+    @Rule
+    public ExpectedException thrown = ExpectedException.none();
+
+    @Before
+    public void setUp() throws Exception {
         try
         {
-            logger.info("Starting setup");
+            System.out.println("Starting setup");
 
-            CompositeConfiguration configuration = OrganizerProperties.getInstance();
-            RestAssured.defaultParser = Parser.JSON;
-            RestAssured.baseURI = "http://";
-            String tomcatHost = configuration.getString("tomcat_host", "localhost");
-            RestAssured.baseURI += tomcatHost;
-            RestAssured.port = configuration.getInteger("tomcat_port", 8080);
-            String tomcatContext = configuration.getString("tomcat_context", "organizer");
-            RestAssured.basePath = tomcatContext + "/v1";
+            // start the server
+            baseUri = OrganizerProperties.getInstance().getString("grizzly_uri", "http://localhost:8888/organizer");
+            server = GrizzlyServer.startServer(baseUri);
+            target = webClient.target(baseUri);
 
-            Awaitility.setDefaultTimeout(5, MINUTES);
-            Awaitility.setDefaultPollInterval(1, MINUTES);
-            Awaitility.setDefaultPollDelay(10, SECONDS);
-
-            logger.info("Setup successful");
+            System.out.println("Setup successful");
         }
         catch (Exception e)
         {
@@ -52,48 +48,47 @@ public class ResourceTest {
         }
     }
 
+    @After
+    public void tearDown() throws Exception {
+        server.stop();
+    }
+
     @Test
-    public void addClient() throws Exception
+    public void addPerson() throws Exception
     {
-        HashMap<String, Object> input = new HashMap<>();
+        Form input = new Form();
         String name = "person" + System.currentTimeMillis();
-        input.put("name", name);
-        input.put("email", name + "@jingtie.com");
+        input.putSingle("name", name);
+        input.putSingle("email", name + "@jingtie.com");
 
-        Response response = expect()
-                .statusCode(javax.ws.rs.core.Response.Status.OK.getStatusCode())
-                .given()
-                .formParameters(input)
-                .when()
-                .post("/person/add");
+        DataEntity dataEntity = webClient
+                .target(baseUri)
+                .path("/person/add")
+                .request(MediaType.APPLICATION_JSON)
+                .post(Entity.entity(input, MediaType.APPLICATION_FORM_URLENCODED), DataEntity.class);
 
-        JsonPath json = response.getBody().jsonPath();
-        logger.info("created person json: " + json.prettify());
+        assertNotNull("person creation response should not be null", dataEntity);
+        Integer personId = (Integer)dataEntity.getProperties().get("personId");
+        System.out.println("created personId: " + personId);
 
-        Map person = json.getObject("properties", HashMap.class);
-        Object idObj = person.get("id");
-        assertNotNull("id of the created person is null", idObj);
-        logger.info("id of created person: " + idObj.toString());
+        dataEntity = webClient
+                .target(baseUri)
+                .path("/person/" + personId)
+                .request(MediaType.APPLICATION_JSON)
+                .get(DataEntity.class);
 
-        Integer personId = (Integer)idObj;
-
-        response = expect()
-                .statusCode(javax.ws.rs.core.Response.Status.OK.getStatusCode())
-                .given()
-                .urlEncodingEnabled(true)
-                .when()
-                .get("/person/{personId}" + personId);
-
-        json = response.getBody().jsonPath();
-        logger.info("found person json: " + json.prettify());
-
-        person = json.getObject("properties", HashMap.class);
-        Object nameObj = person.get("name");
-        assertNotNull("name of the person is null", nameObj);
-        logger.info("name of the person: " + nameObj.toString());
+        assertNotNull("person creation response should not be null", dataEntity);
+        String gottenName = (String)dataEntity.getProperties().get("name");
+        assert gottenName.equalsIgnoreCase(name);
+        System.out.println("Got created person's name: " + gottenName);
     }
 
 
+    private HttpServer server;
+    private WebTarget target;
+    private Client webClient = ClientBuilder.newClient().register(JacksonFeature.class);
+    private static String baseUri = null;
     private static Logger logger = Logger.getLogger(ResourceTest.class);
 
 }
+

@@ -38,7 +38,7 @@ public class PersonResource {
             logger.debug("Person created: " + person.getId());
 
             HashMap<String, Object> props = new HashMap<>(1);
-            props.put("id", person.getId());
+            props.put("personId", person.getId());
             DataEntity dataEntity = new DataEntity(props);
             return dataEntity;
         }
