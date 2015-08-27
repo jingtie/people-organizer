@@ -13,11 +13,13 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import javax.ws.rs.NotFoundException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -76,6 +78,17 @@ public class ResourceTest {
         familyIds.add(secondFamily);
         resultFamilyIds = groupPersonIntoFamilies(secondPersonId, familyIds);
         assert resultFamilyIds.size() == 2;
+
+        List<PersonDao> personList = listPerson();
+        assert personList.size() == 2;
+
+        deletePerson(firstPersonId);
+        personList = listPerson();
+        assert personList.size() == 1;
+
+        deletePerson(secondPersonId);
+        personList = listPerson();
+        assert personList.size() == 0;
     }
 
 
@@ -182,6 +195,37 @@ public class ResourceTest {
         return resultFamilyIds;
     }
 
+
+    public void deletePerson(int personId)
+    {
+        Response response = webClient
+                .target(baseUri)
+                .path("/person/" + personId)
+                .request(MediaType.APPLICATION_JSON)
+                .delete();
+
+        thrown.expect(NotFoundException.class);
+        DataEntity dataEntity = webClient
+                .target(baseUri)
+                .path("/person/" + personId)
+                .request(MediaType.APPLICATION_JSON)
+                .get(DataEntity.class);
+    }
+
+
+    public List<PersonDao> listPerson()
+    {
+        DataEntity dataEntity = webClient
+                .target(baseUri)
+                .path("/person/list")
+                .request(MediaType.APPLICATION_JSON)
+                .get(DataEntity.class);
+
+        assertNotNull("list person response should not be null", dataEntity);
+        List<PersonDao> gottenList = (List<PersonDao>)dataEntity.getProperties().get("list");
+        System.out.println("total person: " + gottenList.size());
+        return gottenList;
+    }
 
 
     private HttpServer server;

@@ -4,7 +4,6 @@ import com.jingtie.organizer.dao.FamilyDao;
 import com.jingtie.organizer.dao.PersonDao;
 import com.jingtie.organizer.db.H2Impl;
 import com.jingtie.organizer.db.IDataStore;
-import org.h2.message.DbException;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -53,14 +52,20 @@ public class H2Test {
                 assert member1 == firstPerson.getId();
             }
 
-            dataStore.putPersonInFamilies(firstPerson.getId(), familyIds);
-            exception.expect(DbException.class);
-            System.out.println("Expected exception: Unique index or primary key violation");
+            List<PersonDao> personList = dataStore.listPerson();
+            assert personList.size() == 2;
 
             dataStore.deletePerson(secondPerson.getId());
             members = dataStore.getMembers(firstFamily.getId());
             assert members.size() == 1;
             assert members.get(0).getId() == firstPerson.getId();
+
+            personList = dataStore.listPerson();
+            assert personList.size() == 1;
+
+            dataStore.deletePerson(firstPerson.getId());
+            personList = dataStore.listPerson();
+            assert personList.size() == 0;
         }
         catch (Throwable t)
         {

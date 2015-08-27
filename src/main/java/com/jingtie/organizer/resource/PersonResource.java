@@ -59,7 +59,7 @@ public class PersonResource {
 
 
     @GET
-    @Path("{personId}")
+    @Path("/{personId}")
     @Encoded
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.APPLICATION_JSON)
@@ -67,28 +67,61 @@ public class PersonResource {
     {
         assertTrue("personId is empty", personId != null && !personId.equals(""));
 
+        final PersonDao person;
         try
         {
             final int id = Integer.parseInt(personId);
             final IDataStore dataStore = H2Impl.getInstance();
-            final PersonDao person = dataStore.getPerson(id);
-            if(person == null)
-            {
-                logger.error("Person Not Found or Been Deleted. personId=" + personId);
-                throw new OrganizerException(Response.Status.NOT_FOUND, "Person Not Found or Been Deleted");
-            }
+            person = dataStore.getPerson(id);
+        }
+        catch (Throwable t)
+        {
+            logger.error("Get person exception", t);
+
+            final StringWriter sw = new StringWriter();
+            final PrintWriter pw = new PrintWriter(sw);
+            t.printStackTrace(pw);
+            final String errorMessage = t.getMessage() + ", StackTrace: " + sw.toString();
+
+            throw new OrganizerException(Response.Status.INTERNAL_SERVER_ERROR, errorMessage);
+        }
+
+        if(person == null)
+        {
+            logger.error("Person Not Found or Been Deleted. personId=" + personId);
+            throw new NotFoundException("Person Not Found or Been Deleted");
+        }
+
+        final HashMap<String, Object> props = new HashMap<>();
+        props.put("name", person.getName());
+        props.put("email", person.getEmail());
+        props.put("createdTime", person.getCreatedTime() + "");
+
+        final DataEntity dataEntity = new DataEntity(props);
+        return dataEntity;
+    }
+
+
+    @GET
+    @Path("/list")
+    @Encoded
+    @Produces(MediaType.APPLICATION_JSON)
+    public DataEntity listPerson()
+    {
+        try
+        {
+            final IDataStore dataStore = H2Impl.getInstance();
+            List<PersonDao> personList = dataStore.listPerson();
 
             final HashMap<String, Object> props = new HashMap<>();
-            props.put("name", person.getName());
-            props.put("email", person.getEmail());
-            props.put("createdTime", person.getCreatedTime() + "");
+            props.put("list", personList);
 
             final DataEntity dataEntity = new DataEntity(props);
             return dataEntity;
         }
         catch (Throwable t)
         {
-            logger.error("Get person exception", t);
+            logger.error("List person exception", t);
 
             final StringWriter sw = new StringWriter();
             final PrintWriter pw = new PrintWriter(sw);
@@ -158,6 +191,59 @@ public class PersonResource {
         }
     }
 
+
+    @DELETE
+    @Path("/{personId}")
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response deletePerson(@PathParam("personId") String personId)
+    {
+        assertTrue("personId is empty", personId != null && !personId.equals(""));
+
+        final PersonDao person;
+        int iPersonId;
+        final IDataStore dataStore = H2Impl.getInstance();
+        try
+        {
+            iPersonId = Integer.parseInt(personId);
+            person = dataStore.getPerson(iPersonId);
+        }
+        catch (Throwable t)
+        {
+            logger.error("Delete person exception", t);
+
+            final StringWriter sw = new StringWriter();
+            final PrintWriter pw = new PrintWriter(sw);
+            t.printStackTrace(pw);
+            final String errorMessage = t.getMessage() + ", StackTrace: " + sw.toString();
+
+            throw new OrganizerException(Response.Status.INTERNAL_SERVER_ERROR, errorMessage);
+        }
+
+        if(person == null)
+        {
+            logger.error("Person Not Found or Been Deleted. personId=" + personId);
+            return Response.status(Response.Status.NOT_FOUND).entity("Person Not Found or Been Deleted").type("text/plain").build();
+        }
+
+        try
+        {
+            dataStore.deletePerson(iPersonId);
+            return Response.ok().entity("Person Not Found or Been Deleted").type("text/plain").build();
+        }
+        catch (Throwable t)
+        {
+            logger.error("Delete person exception", t);
+
+            final StringWriter sw = new StringWriter();
+            final PrintWriter pw = new PrintWriter(sw);
+            t.printStackTrace(pw);
+            final String errorMessage = t.getMessage() + ", StackTrace: " + sw.toString();
+
+            throw new OrganizerException(Response.Status.INTERNAL_SERVER_ERROR, errorMessage);
+        }
+
+    }
 
 
     private static final Logger logger = Logger.getLogger(PersonResource.class);

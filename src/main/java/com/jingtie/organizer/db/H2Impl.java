@@ -369,7 +369,7 @@ public class H2Impl implements IDataStore {
             Timestamp timestamp = getCurrentTimeStamp();
             connection = poolingDataStore.getConnection();
 
-            String sql = "UPDATE " + schemaName + ".PERSON SET (DELETED_TIME = ?) WHERE ID = ? AND DELETED_TIME IS NULL;";
+            String sql = "UPDATE " + schemaName + ".PERSON SET DELETED_TIME = ? WHERE ID = ? AND DELETED_TIME IS NULL;";
             stmt = connection.prepareStatement(sql);
             stmt.setTimestamp(1, timestamp);
             stmt.setInt(2, personId);
@@ -379,6 +379,42 @@ public class H2Impl implements IDataStore {
         {
             poolingDataStore.close(connection, stmt, null);
         }
+    }
+
+    @Override
+    public List<PersonDao> listPerson() throws SQLException {
+        PreparedStatement stmt = null;
+        Connection connection = null;
+        ResultSet resultSet = null;
+        List<PersonDao> personList = new LinkedList<>();
+
+        try
+        {
+            connection = poolingDataStore.getConnection();
+
+            String sql = "SELECT ID, NAME, EMAIL, CREATED_TIME, MODIFIED_TIME FROM " + schemaName +
+                    ".PERSON WHERE DELETED_TIME IS NULL;";
+            stmt = connection.prepareStatement(sql);
+            resultSet = stmt.executeQuery();
+
+            while(resultSet.next())
+            {
+                int personId = resultSet.getInt(1);
+                String personName = resultSet.getString(2);
+                String email = resultSet.getString(3);
+                Timestamp createdTimestamp = resultSet.getTimestamp(4);
+                Timestamp modifiedTimestamp = resultSet.getTimestamp(5);
+                PersonDao person = new PersonDao(personId, personName, email, createdTimestamp.getTime(),
+                        modifiedTimestamp.getTime(), null);
+                personList.add(person);
+            }
+        }
+        finally
+        {
+            poolingDataStore.close(connection, stmt, resultSet);
+        }
+
+        return personList;
     }
 
     private static java.sql.Timestamp getCurrentTimeStamp()

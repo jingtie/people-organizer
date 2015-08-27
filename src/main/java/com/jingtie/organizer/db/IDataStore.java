@@ -25,4 +25,6 @@ public interface IDataStore {
 
     void deletePerson(int personId) throws SQLException;
 
+    List<PersonDao> listPerson() throws SQLException;
+
 }
