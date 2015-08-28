@@ -5,8 +5,10 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.jingtie</groupId>
+    <packaging>war</packaging>
     <artifactId>organizer</artifactId>
     <version>1.0</version>
+    <name>organizer</name>
 
     <dependencies>
         <dependency>

@@ -1,24 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <title>Client</title>
+    <title>Organizer</title>
+    <style>
+        h1 {
+        border-bottom: 3px solid #cc9900;
+        color: #996600;
+        font-size: 30px;
+        }
+        table, th , td {
+        border: 1px solid grey;
+        border-collapse: collapse;
+        padding: 5px;
+        }
+        table tr:nth-child(odd) {
+        background-color: #f1f1f1;
+        }
+        table tr:nth-child(even) {
+        background-color: #ffffff;
+        }
+    </style>
 </head>
-
 <body>
 
-<h1>Create Person</h1>
-<form action="v1/person/add" method="post" enctype="application/x-www-form-urlencoded">
-    <p>
-        New Client Name: <input type="text" name="name"/>
-    </p>
-    <p>
-        Email: <input type="text" name="email"/>
-    </p>
-    <input type="submit" value="Create"/>
-</form>
+<h1>Welcome to Person Organizer</h1>
+<h3>Person List:</h3>
+<div id="id01"></div>
+
+<script>
+var xmlhttp = new XMLHttpRequest();
+var url = "http://localhost:8080/organizer/v1/person/list";
+
+xmlhttp.onreadystatechange=function() {
+    if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+        listPerson(xmlhttp.responseText);
+    }
+}
+xmlhttp.open("GET", url, true);
+xmlhttp.send();
+
+function listPerson(response) {
+    var entity = JSON.parse(response);
+    var properties = entity.properties;
+    var arr = properties.list;
+    var i;
+    var out = "<table>";
+    out += "<tr><td>Id</td><td>Name</td><td>Email</td><td>Created Time</td></tr>";
+
+    for(i = 0; i < arr.length; i++) {
+        out += "<tr><td>" +
+        arr[i].id +
+        "</td><td>" +
+        arr[i].name +
+        "</td><td>" +
+        arr[i].email +
+        "</td><td>" +
+        Date(arr[i].createdTime) +
+        "</td></tr>";
+    }
+    out += "</table>";
+    document.getElementById("id01").innerHTML = out;
+}
+</script>
+
+<p><a href="http://localhost:8080/organizer/createperson.html">Create Person</a></p>
+<p><a href="http://localhost:8080/organizer/createfamily.html">Create Family</a></p>
 
 </body>
-
 </html>
