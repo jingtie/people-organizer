@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Client</title>
+</head>
+
+<body>
+
+<h1>Create Family</h1>
+<form action="v1/family/add" method="post" enctype="application/x-www-form-urlencoded">
+    <p>
+        Family Name: <input type="text" name="name"/>
+    </p>
+    <p>
+        Member Ids (separated by semicolon): <input type="text" name="memberIds"/>
+    </p>
+    <input type="submit" value="Create"/>
+</form>
+
+<p><a href="http://localhost:8080/organizer/index.html">List Person</a></p>
+
+</body>
+
+</html>
